@@ -1,11 +1,10 @@
 package gojiid
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"goji.io"
-	"golang.org/x/net/context"
 	"net/http"
 	"os"
 	"strings"
@@ -47,29 +46,27 @@ func init() {
 }
 
 // creates the default middleware that just generates an id using the default generator
-func NewRequestId() func(goji.Handler) goji.Handler {
+func NewRequestId() func(http.Handler) http.Handler {
 	config := &RequestIdConfig{make([]string, 0), defaultGenerator}
 	return NewCustomRequestId(config)
 }
 
 // creates the middleware configured with custom Headers and Generator function
-func NewCustomRequestId(config *RequestIdConfig) func(goji.Handler) goji.Handler {
-	return func(h goji.Handler) goji.Handler {
-		fn := func(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-
+func NewCustomRequestId(config *RequestIdConfig) func(http.Handler) http.Handler {
+	return func(h http.Handler) http.Handler {
+		fn := func(w http.ResponseWriter, r *http.Request) {
 			reqId, ok := fromHeaders(config.Headers, r)
-
 			if !ok {
 				reqId = config.Generator(r)
 			}
 
 			if len(reqId) > 0 {
-				ctx = context.WithValue(ctx, requestIdKey, reqId)
+				r = r.WithContext(context.WithValue(r.Context(), requestIdKey, reqId))
 			}
 
-			h.ServeHTTPC(ctx, w, r)
+			h.ServeHTTP(w, r)
 		}
-		return goji.HandlerFunc(fn)
+		return http.HandlerFunc(fn)
 	}
 }
 
